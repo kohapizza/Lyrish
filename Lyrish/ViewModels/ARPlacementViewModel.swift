@@ -13,6 +13,7 @@ class ARPlacementViewModel: ObservableObject {
     @Published var lyricText: String = ""
     @Published var songTitle: String = ""
     @Published var artistName: String = ""
+    @Published var imageName: String = ""
     @Published var memory: String = ""
     @Published var isPlacing: Bool = false
     
@@ -22,7 +23,7 @@ class ARPlacementViewModel: ObservableObject {
     func placeLyric() {
         guard !lyricText.isEmpty, !songTitle.isEmpty, !artistName.isEmpty else { return }
         
-        let song = Song(title: songTitle, artist: artistName)
+        let song = Song(title: songTitle, artist: artistName, imageName: imageName)
         let location = locationManager.location?.coordinate ?? CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
         
         let lyricSpot = LyricSpot(

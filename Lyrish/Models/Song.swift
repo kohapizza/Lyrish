@@ -11,11 +11,11 @@ struct Song: Identifiable, Codable {
     let id = UUID()
     let title: String
     let artist: String
-    let albumArtwork: String?
+    let imageName: String
     
-    init(title: String, artist: String, albumArtwork: String? = nil) {
+    init(title: String, artist: String, imageName: String) {
         self.title = title
         self.artist = artist
-        self.albumArtwork = albumArtwork
+        self.imageName = imageName
     }
 }

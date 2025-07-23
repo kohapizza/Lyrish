@@ -27,9 +27,9 @@ class LocalDataService: ObservableObject {
     
     private func loadSampleData() {
         let sampleSongs = [
-            Song(title: "Shake It Off", artist: "Taylor Swift"),
-            Song(title: "Hotline Bling", artist: "Drake"),
-            Song(title: "Bad Guy", artist: "Billie Eilish")
+            Song(title: "Shake It Off", artist: "Taylor Swift", imageName: ""),
+            Song(title: "Hotline Bling", artist: "Drake", imageName: ""),
+            Song(title: "Bad Guy", artist: "Billie Eilish", imageName: "")
         ]
         
         let sampleLyrics = [
