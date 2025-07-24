@@ -19,3 +19,14 @@ struct Song: Identifiable, Codable {
         self.imageName = imageName
     }
 }
+
+// 歌詞の各行を表す構造体（一意のIDを持つ）
+struct LyricLine: Identifiable, Equatable {
+    let id = UUID() // 各行に一意のIDを付与
+    let text: String // 歌詞のテキスト内容
+
+    // Equatableに準拠させることで、選択時の比較がより安全になる
+    static func == (lhs: LyricLine, rhs: LyricLine) -> Bool {
+        lhs.id == rhs.id
+    }
+}

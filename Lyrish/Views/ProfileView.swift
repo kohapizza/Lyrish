@@ -13,7 +13,7 @@ struct ProfileView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color(red: 0.08, green: 0.08, blue: 0.08).ignoresSafeArea()
                 
                 VStack(spacing: 20) {
                     // Profile Header

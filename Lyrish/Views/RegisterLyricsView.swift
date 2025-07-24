@@ -12,110 +12,141 @@ struct RegisterLyricsView: View {
     @StateObject private var viewModel = ARPlacementViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
+    @State private var suggestedSongs: [Song] = []
+
+    @StateObject private var spotifyService = SpotifyAPIService() // SpotifyAPIServiceのインスタンス
     
-    let songs = [
-        Song(title: "Please me (feat. MFS)", artist: "Pasocom Music Club", imageName: "album1"),
-        Song(title: "Disco", artist: "mitsume", imageName: "album2"),
-        Song(title: "Erica", artist: "Sad Kid Yaz", imageName: "album3"),
-        Song(title: "sad song", artist: "the bercedes menz", imageName: "album4"),
-        Song(title: "Monkeys", artist: "SATOH", imageName: "album5"),
-        Song(title: "Loco Freestyle", artist: "Sad Kid Yaz", imageName: "album6"),
-        Song(title: "Koi Wo Shita", artist: "Chara", imageName: "album7"),
-        Song(title: "Money Rain (feat. v3geboy)", artist: "Sad Kid Yaz", imageName: "album8"),
-        Song(title: "Weather Report", artist: "ミツメ", imageName: "album9")
-    ]
-    
-    var filteredSongs: [Song] {
-        if searchText.isEmpty {
-            return songs
-        } else {
-            return songs.filter { song in
-                song.title.localizedCaseInsensitiveContains(searchText) ||
-                song.artist.localizedCaseInsensitiveContains(searchText)
-            }
-        }
-    }
-    
+    // 歌詞登録画面への遷移を制御するState
+    @State private var showLyricsRegistration = false
+    @State private var selectedSong: Song? // 選択された曲を保持
+
     var body: some View {
         NavigationView {
             ZStack {
                 Color(red: 0.08, green: 0.08, blue: 0.08).ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // Header
                     RoundedRectangle(cornerRadius: 2.5)
                         .fill(Color.gray.opacity(0.5))
                         .frame(width: 40, height: 5)
                         .padding()
-                    
-                    // Content
 
                     // Search Bar
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.gray)
                             .padding(.leading, 12)
-                        
+
                         TextField("Search audio", text: $searchText)
                             .textFieldStyle(PlainTextFieldStyle())
                             .padding(.vertical, 12)
                             .padding(.trailing, 12)
+                            .onChange(of: searchText) { newValue in
+                                Task {
+                                    await searchSpotifyTracks(query: newValue)
+                                }
+                            }
                     }
                     .background(Color(.systemGray6))
                     .cornerRadius(10)
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
-                    
-                    // Song List
-                     List(filteredSongs, id: \.id) { song in
+
+                    // Song List (Spotify APIからのサジェスト結果を表示)
+                     List(suggestedSongs, id: \.id) { song in
                          SongRowView(song: song)
                              .listRowSeparator(.hidden)
                              .listRowBackground(Color.clear)
+                             .onTapGesture {
+                                 // 曲が選択されたらLyricsRegistrationViewに遷移
+                                 selectedSong = song
+                                 showLyricsRegistration = true
+                             }
                      }
                      .listStyle(PlainListStyle())
                      .padding(.top, 10)
-                    
+
                     Spacer()
                 }
             }
             .navigationBarHidden(true)
+            .sheet(isPresented: $showLyricsRegistration) {
+                // 歌詞登録画面に遷移し、選択された曲情報を渡す
+                if let song = selectedSong {
+                    LyricsRegistrationView(arPlacementViewModel: {
+                        let vm = ARPlacementViewModel()
+                        vm.songTitle = song.title
+                        vm.artistName = song.artist
+                        vm.imageName = song.imageName
+                        return vm
+                    }())
+                }
+            }
+        }
+    }
+
+    // Spotify APIを呼び出す非同期関数
+    func searchSpotifyTracks(query: String) async {
+        guard !query.isEmpty else {
+            suggestedSongs = []
+            return
+        }
+        do {
+            let tracks = try await spotifyService.searchTracks(query: query)
+            suggestedSongs = tracks
+        } catch {
+            print("Error searching Spotify: \(error)")
+            suggestedSongs = []
         }
     }
 }
 
+// SongRowViewは変更なし
 struct SongRowView: View {
     let song: Song
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Album Art
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(.systemGray4))
+            if let url = URL(string: song.imageName) {
+                AsyncImage(url: url) { image in
+                    image.resizable()
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.systemGray4))
+                        .overlay(
+                            Image(systemName: "music.note")
+                                .foregroundColor(.gray)
+                        )
+                }
                 .frame(width: 50, height: 50)
-                .overlay(
-                    Image(systemName: "music.note")
-                        .foregroundColor(.gray)
-                )
-            
+                .cornerRadius(8)
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(.systemGray4))
+                    .frame(width: 50, height: 50)
+                    .overlay(
+                        Image(systemName: "music.note")
+                            .foregroundColor(.gray)
+                    )
+            }
+
             // Song Info
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.white)
-                
+
                 Text(song.artist)
                     .font(.system(size: 14))
                     .foregroundColor(.secondary)
             }.lineLimit(1)
-            
+
             Spacer()
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
-        .onTapGesture {
-            // Handle song selection
-            print("Selected: \(song.title)")
-        }
     }
 }
 

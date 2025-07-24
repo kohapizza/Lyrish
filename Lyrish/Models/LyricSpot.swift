@@ -29,7 +29,14 @@ struct LyricSpot: Identifiable, Codable {
     }
 }
 
-extension CLLocationCoordinate2D: Codable {
+extension CLLocationCoordinate2D: Codable, Equatable {
+
+    // Equatableプロトコルの要件である == 演算子の実装
+    // 緯度と経度が両方とも等しい場合にtrueを返す
+    public static func == (lhs: CLLocationCoordinate2D, rhs: CLLocationCoordinate2D) -> Bool {
+        return lhs.latitude == rhs.latitude && lhs.longitude == rhs.longitude
+    }
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(latitude, forKey: .latitude)
