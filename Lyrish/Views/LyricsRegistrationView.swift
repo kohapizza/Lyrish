@@ -7,24 +7,32 @@
 
 import SwiftUI
 import CoreLocation
-import MapKit // MapKitをインポート (Reverse Geocodingのため)
+import MapKit
 
 struct LyricsRegistrationView: View {
     @Environment(\.dismiss) var dismiss
-    @StateObject var arPlacementViewModel: ARPlacementViewModel
+    @ObservedObject var arPlacementViewModel: ARPlacementViewModel
     @StateObject private var lyricsFetcher = LyricsFetcher()
-    // LocationManagerはLocationSelectionViewに移動
-    // @StateObject private var locationManager = LocationManager()
 
     @State private var lines: [LyricLine] = []
     @State private var selectedLineId: UUID? = nil
     @State private var selectedLineText: String = ""
 
-    // 場所関連のState変数 (LocationSelectionViewと共有)
     @State private var selectedLocationForRegistration: CLLocationCoordinate2D? = nil
     @State private var selectedLocationNameForRegistration: String = "未選択"
 
-    @State private var showingLocationSelectionSheet = false // マップシート表示制御
+    @State private var showingLocationSelectionSheet = false
+
+    @State private var initialSongTitle: String
+    @State private var initialArtistName: String
+    @State private var initialImageName: String
+
+    init(arPlacementViewModel: ARPlacementViewModel, songTitle: String, artistName: String, imageName: String) {
+        _arPlacementViewModel = ObservedObject(wrappedValue: arPlacementViewModel)
+        _initialSongTitle = State(initialValue: songTitle)
+        _initialArtistName = State(initialValue: artistName)
+        _initialImageName = State(initialValue: imageName)
+    }
 
     var body: some View {
         NavigationView {
@@ -41,7 +49,6 @@ struct LyricsRegistrationView: View {
                     LyricCard(lyricSpot: LyricSpot(lyricText: "", song: Song(title: arPlacementViewModel.songTitle, artist: arPlacementViewModel.artistName, imageName: arPlacementViewModel.imageName), user: LocalDataService.shared.currentUser, location: .init(), memory: ""))
                         .padding(.horizontal)
                     
-                    // 歌詞選択エリア
                     VStack(alignment: .leading, spacing: 5) {
                         Text("歌詞を選択してください:")
                             .font(.headline)
@@ -84,7 +91,6 @@ struct LyricsRegistrationView: View {
                         .padding(.horizontal)
                     }
                     
-                    // 選択された歌詞のプレビュー（確認用）
                     if !selectedLineText.isEmpty {
                         Text("選択された歌詞:")
                             .font(.headline)
@@ -99,7 +105,6 @@ struct LyricsRegistrationView: View {
                             .padding(.horizontal)
                     }
                     
-                    // MARK: - 場所の選択エリア
                     VStack(alignment: .leading, spacing: 5) {
                         Text("場所を設定:")
                             .font(.headline)
@@ -107,10 +112,10 @@ struct LyricsRegistrationView: View {
                             .padding(.horizontal)
                         
                         Button(action: {
-                            showingLocationSelectionSheet = true // マップシートを表示
+                            showingLocationSelectionSheet = true
                         }) {
                             HStack {
-                                Image(systemName: "mappin.and.ellipse") // ピンアイコンに変更
+                                Image(systemName: "mappin.and.ellipse")
                                     .foregroundColor(.gray)
                                 Text(selectedLocationNameForRegistration.isEmpty || selectedLocationNameForRegistration == "未選択" ? "タップして場所を選択" : selectedLocationNameForRegistration)
                                     .foregroundColor(.white)
@@ -125,7 +130,6 @@ struct LyricsRegistrationView: View {
                         }
                     }
                     
-                    // キャプションの入力
                     VStack(alignment: .leading, spacing: 5) {
                         Text("キャプションを追加:")
                             .font(.headline)
@@ -138,17 +142,15 @@ struct LyricsRegistrationView: View {
                             .padding(.horizontal)
                     }
                     
-                    // 登録ボタン
                     CustomButton(title: "歌詞を登録", action: {
                         arPlacementViewModel.lyricText = selectedLineText
                         if let loc = selectedLocationForRegistration {
-                            arPlacementViewModel.location = loc // マップで選択された場所を設定
+                            arPlacementViewModel.location = loc
                         }
                         arPlacementViewModel.placeLyric()
                         dismiss()
                     }, style: .primary)
                     .padding(.horizontal)
-                    // 場所が選択されていない場合はボタンを無効化
                     .disabled(lyricsFetcher.isLoading || selectedLineText.isEmpty || arPlacementViewModel.memory.isEmpty || selectedLocationForRegistration == nil)
                     
                     Spacer()
@@ -161,15 +163,22 @@ struct LyricsRegistrationView: View {
                     .font(.title2)
                     .foregroundColor(.gray)
             })
-            // .navigationBarHidden(true) // カスタムナビゲーションバーを使用しない場合はコメントアウト
             .sheet(isPresented: $showingLocationSelectionSheet) {
-                // LocationSelectionViewを表示し、選択された場所と地名をバインディングで受け取る
                 LocationSelectionView(selectedLocation: $selectedLocationForRegistration, selectedLocationName: $selectedLocationNameForRegistration)
             }
             .onAppear {
-                // 歌詞の取得は変更なし
+                // MARK: - ここを修正: DispatchQueue.main.async を使ってプロパティ変更を遅延させる
+                DispatchQueue.main.async {
+                    arPlacementViewModel.songTitle = initialSongTitle
+                    arPlacementViewModel.artistName = initialArtistName
+                    arPlacementViewModel.imageName = initialImageName
+                }
+
+                // 歌詞の取得はTaskで非同期に行う
                 Task {
-                    let fullQuery = "\(arPlacementViewModel.songTitle) \(arPlacementViewModel.artistName)"
+                    // onAppear時にarPlacementViewModelのプロパティがまだ設定されていない可能性があるので、
+                    // initialSongTitleとinitialArtistNameを直接使う
+                    let fullQuery = "\(initialSongTitle) \(initialArtistName)"
                     await lyricsFetcher.fetchLyrics(for: fullQuery)
                     if lyricsFetcher.errorMessage == nil {
                         self.lines = lyricsFetcher.lyrics.split(separator: "\n")
@@ -183,15 +192,16 @@ struct LyricsRegistrationView: View {
     }
 }
 
-// プレビュープロバイダ
+// プレビュープロバイダ (イニシャライザに合わせて修正)
 struct LyricsRegistrationView_Previews: PreviewProvider {
     static var previews: some View {
         LyricsRegistrationView(arPlacementViewModel: {
             let vm = ARPlacementViewModel()
-            vm.songTitle = "Fancy Cozy"
-            vm.artistName = "who28"
+            // プレビュー表示のために初期値を設定
+            vm.songTitle = "Fancy Cozy (Preview)"
+            vm.artistName = "who28 (Preview)"
             vm.imageName = ""
             return vm
-        }())
+        }(), songTitle: "Fancy Cozy (Preview)", artistName: "who28 (Preview)", imageName: "")
     }
 }

@@ -6,25 +6,25 @@
 //
 
 import SwiftUI
-import MapKit // MapKitをインポート
+import MapKit
 
 struct LyricSpotView: View {
     @StateObject private var viewModel = LyricSpotViewModel()
-    @StateObject private var locationManager = LocationManager() // ロケーションマネージャーを追加
+    @StateObject private var locationManager = LocationManager()
+    @EnvironmentObject var arPlacementViewModel: ARPlacementViewModel // EnvironmentObjectとして受け取る
 
-    // マップの表示領域を管理するState
     @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 35.6895, longitude: 139.6917), // 東京の緯度経度を初期値に設定
+        center: CLLocationCoordinate2D(latitude: 35.6895, longitude: 139.6917), // 東京
         span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
     )
 
+    @State private var showingAllLyricsAR = false // ARViewを直接開くためのState
+
     var body: some View {
         NavigationView {
-            ZStack {
-                // マップビュー
+            ZStack(alignment: .bottomTrailing) {
                 Map(coordinateRegion: $region, showsUserLocation: true, annotationItems: viewModel.lyricSpots) { spot in
                     MapAnnotation(coordinate: spot.location) {
-                        // マップ上のピンのデザイン
                         VStack {
                             Image(systemName: "music.note.house.fill")
                                 .font(.title2)
@@ -45,30 +45,66 @@ struct LyricSpotView: View {
                 }
                 .edgesIgnoringSafeArea(.all)
                 .onAppear {
-                    // ユーザーの位置情報が利用可能であれば、マップの中心をユーザーの現在地にする
                     if let userLocation = locationManager.location?.coordinate {
                         region.center = userLocation
                     } else {
-                        // ロケーションパーミッションをリクエスト
                         locationManager.requestPermission()
                     }
-                    viewModel.loadLyricSpots() // 歌詞スポットをロード
-                    locationManager.startUpdatingLocation() // 位置情報の更新を開始
+                    viewModel.loadLyricSpots()
+                    locationManager.startUpdatingLocation()
                 }
                 .onDisappear {
-                    locationManager.stopUpdatingLocation() // 位置情報の更新を停止
+                    locationManager.stopUpdatingLocation()
                 }
 
-                VStack {
-                    Spacer()
-                    // 必要であればここにマップに関するUI要素を追加
+                // MARK: - ARモード開始ボタン
+                Button(action: {
+                    showingAllLyricsAR = true // 全ての歌詞ARビューを表示
+                }) {
+                    Image(systemName: "arkit")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .frame(width: 56, height: 56)
+                        .background(
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.green, .cyan],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        )
+                        .shadow(radius: 5)
                 }
+                .padding(.trailing, 20)
+                .padding(.bottom, 80)
+
             }
             .navigationBarHidden(true)
+            // MARK: - ARViewのフルスクリーン表示 (全歌詞スポット用)
+            .fullScreenCover(isPresented: $showingAllLyricsAR) {
+                // ここでuserLocationを渡す
+                ARViewContainer(lyricSpots: viewModel.lyricSpots, userLocation: locationManager.location) // ここを修正！
+                    .edgesIgnoringSafeArea(.all)
+                    .overlay(alignment: .topLeading) {
+                        Button("AR終了") {
+                            showingAllLyricsAR = false
+                        }
+                        .padding()
+                        .foregroundColor(.white)
+                        .background(Color.black.opacity(0.5))
+                        .cornerRadius(10)
+                        .padding(.top, 40)
+                        .padding(.leading, 20)
+                    }
+            }
         }
     }
 }
 
 #Preview {
     LyricSpotView()
+        .environmentObject(ARPlacementViewModel()) // プレビュー用にViewModelを渡す
 }

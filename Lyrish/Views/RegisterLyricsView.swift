@@ -9,7 +9,8 @@ import Foundation
 import SwiftUI
 
 struct RegisterLyricsView: View {
-    @StateObject private var viewModel = ARPlacementViewModel()
+    // @StateObject private var viewModel = ARPlacementViewModel() // ここは削除し、EnvironmentObjectで受け取る
+    @EnvironmentObject var arPlacementViewModel: ARPlacementViewModel // EnvironmentObjectとしてARPlacementViewModelを受け取る
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
     @State private var suggestedSongs: [Song] = []
@@ -53,7 +54,7 @@ struct RegisterLyricsView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
 
-                    // Song List (Spotify APIからのサジェスト結果を表示)
+                     // Song List (Spotify APIからのサジェスト結果を表示)
                      List(suggestedSongs, id: \.id) { song in
                          SongRowView(song: song)
                              .listRowSeparator(.hidden)
@@ -74,13 +75,11 @@ struct RegisterLyricsView: View {
             .sheet(isPresented: $showLyricsRegistration) {
                 // 歌詞登録画面に遷移し、選択された曲情報を渡す
                 if let song = selectedSong {
-                    LyricsRegistrationView(arPlacementViewModel: {
-                        let vm = ARPlacementViewModel()
-                        vm.songTitle = song.title
-                        vm.artistName = song.artist
-                        vm.imageName = song.imageName
-                        return vm
-                    }())
+                    // LyricsRegistrationViewに既存のARPlacementViewModelインスタンスを渡す
+                    LyricsRegistrationView(arPlacementViewModel: arPlacementViewModel, // EnvironmentObjectを使用せず、直接ViewModelを渡す
+                                           songTitle: song.title,
+                                           artistName: song.artist,
+                                           imageName: song.imageName)
                 }
             }
         }
@@ -152,5 +151,7 @@ struct SongRowView: View {
 
 
 #Preview {
+    // プレビュー用にEnvironmentObjectを渡す必要がある
     RegisterLyricsView()
+        .environmentObject(ARPlacementViewModel()) // ARPlacementViewModelのインスタンスを渡す
 }

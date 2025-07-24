@@ -6,18 +6,21 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 struct ContentView: View {
     @State private var selectedTab = 0
-    
-    @State private var showingARPlacement = false
-    
+    @State private var showingARPlacementSheet = false
+
+    @StateObject private var arPlacementViewModel = ARPlacementViewModel()
+    @StateObject private var locationManager = LocationManager() // ここでLocationManagerをインスタンス化
+
     var body: some View {
         ZStack {
-            // TabViewの代わりに条件分岐を使用
             Group {
                 if selectedTab == 0 {
                     LyricSpotView()
+                        .environmentObject(arPlacementViewModel)
                 } else if selectedTab == 1 {
                     ProfileView()
                 }
@@ -27,17 +30,15 @@ struct ContentView: View {
             VStack(alignment: .leading) {
                 Spacer()
                 HStack {
-                    // ホーム地図タブ
                     TabButton(
-                        iconName: "house.fill",
+                        iconName: "map.fill",
                         isSelected: selectedTab == 0
                     ) {
                         selectedTab = 0
                     }
                     
-                    // 中央の目立つボタン
                     Button(action: {
-                        showingARPlacement = true
+                        showingARPlacementSheet = true
                     }) {
                         Image(systemName: "plus")
                             .font(.title2)
@@ -57,7 +58,6 @@ struct ContentView: View {
                     }
                     .offset(y: -13)
                     
-                    // プロフィール
                     TabButton(
                         iconName: "person.fill",
                         isSelected: selectedTab == 1
@@ -69,12 +69,40 @@ struct ContentView: View {
             }
         }
         .accentColor(.white)
-        .sheet(isPresented: $showingARPlacement) {
+        .sheet(isPresented: $showingARPlacementSheet) {
             RegisterLyricsView()
+                .environmentObject(arPlacementViewModel)
         }
-        
+        // MARK: - 歌詞登録後に特定の歌詞をAR表示するフルスクリーンカバー
+        .fullScreenCover(isPresented: $arPlacementViewModel.showARView) {
+            if let lyricSpotToDisplay = arPlacementViewModel.lyricsToDisplayInAR {
+                // ここでuserLocationを渡す
+                ARViewContainer(lyricSpots: [lyricSpotToDisplay], userLocation: locationManager.location) // ここを修正！
+                    .edgesIgnoringSafeArea(.all)
+                    .overlay(alignment: .topLeading) {
+                        Button("AR終了") {
+                            arPlacementViewModel.showARView = false
+                            arPlacementViewModel.lyricsToDisplayInAR = nil
+                        }
+                        .padding()
+                        .foregroundColor(.white)
+                        .background(Color.black.opacity(0.5))
+                        .cornerRadius(10)
+                        .padding(.top, 40)
+                        .padding(.leading, 20)
+                    }
+            } else {
+                EmptyView()
+            }
+        }
+        .onAppear {
+            locationManager.requestPermission() // アプリ起動時に位置情報許可をリクエスト
+            locationManager.startUpdatingLocation() // 位置情報の更新を開始
+        }
+        .onDisappear {
+            locationManager.stopUpdatingLocation() // アプリ終了時に更新を停止
+        }
     }
-    
 }
 
 struct TabButton: View {
@@ -94,7 +122,6 @@ struct TabButton: View {
         .frame(maxWidth: .infinity)
     }
 }
-
 
 #Preview {
     ContentView()
